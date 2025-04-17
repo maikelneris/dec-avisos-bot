@@ -20,10 +20,8 @@ load_dotenv()
 # Set up bot with command prefix '!'
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True  # Enable member intents for user mentions
 bot = commands.Bot(command_prefix='!', intents=intents)
-
-# Channel ID where messages will be sent
-CHANNEL_ID = int(os.getenv('CHANNEL_ID', '0'))
 
 def parse_avisos_file():
     """Parse the AVISOS.md file and return a list of message instructions"""
@@ -32,20 +30,21 @@ def parse_avisos_file():
         with open('AVISOS.md', 'r', encoding='utf-8') as file:
             for line in file:
                 line = line.strip()
-                if line:  # Skip empty lines
+                if line and not line.startswith('#'):  # Skip empty lines and comments
                     try:
-                        days, time, message = line.split(';')
+                        channel_id, days, times, message = line.split(';')
                         # Split days if multiple days are provided
                         days = [day.strip().lower() for day in days.split(',')]
                         # Split time if multiple times are provided
-                        times = [t.strip() for t in time.split(',')]
+                        times = [t.strip() for t in times.split(',')]
                         messages.append({
+                            'channel_id': int(channel_id.strip()),
                             'days': days,
                             'times': times,
                             'message': message
                         })
-                    except ValueError:
-                        logger.error(f"Invalid line format in AVISOS.md: {line}")
+                    except ValueError as e:
+                        logger.error(f"Invalid line format in AVISOS.md: {line} - Error: {str(e)}")
     except FileNotFoundError:
         logger.error("AVISOS.md file not found")
     return messages
@@ -61,23 +60,32 @@ def should_send_message(days, times):
 @tasks.loop(minutes=1)
 async def check_messages():
     """Check and send scheduled messages every minute"""
-    if CHANNEL_ID == 0:
-        logger.warning("CHANNEL_ID is not set")
-        return
-        
-    channel = bot.get_channel(CHANNEL_ID)
-    if not channel:
-        logger.error(f"Could not find channel with ID {CHANNEL_ID}")
-        return
-
     messages = parse_avisos_file()
     for msg in messages:
         if should_send_message(msg['days'], msg['times']):
             try:
-                await channel.send(msg['message'])
-                logger.info(f"Sent message: {msg['message']}")
+                channel = bot.get_channel(msg['channel_id'])
+                if not channel:
+                    logger.error(f"Could not find channel with ID {msg['channel_id']}")
+                    continue
+                    
+                # Process message to handle user mentions
+                processed_message = msg['message']
+                if '@' in processed_message:
+                    # Get all members in the guild
+                    guild = channel.guild
+                    members = guild.members
+                    
+                    # Replace @username with proper mention
+                    for member in members:
+                        if f'@{member.name}' in processed_message or f'@{member.display_name}' in processed_message:
+                            processed_message = processed_message.replace(f'@{member.name}', member.mention)
+                            processed_message = processed_message.replace(f'@{member.display_name}', member.mention)
+                
+                await channel.send(processed_message)
+                logger.info(f"Sent message to channel {msg['channel_id']}: {processed_message}")
             except Exception as e:
-                logger.error(f"Error sending message: {e}")
+                logger.error(f"Error sending message to channel {msg['channel_id']}: {e}")
 
 @bot.event
 async def on_ready():
@@ -107,8 +115,16 @@ async def ping(ctx):
 @bot.command(name='channel_id')
 async def channel_id(ctx):
     """Shows the ID of the current channel"""
-    await ctx.send(f'This channel\'s ID is: `{ctx.channel.id}`\nYou can use this ID in your .env file.')
+    await ctx.send(f'This channel\'s ID is: `{ctx.channel.id}`\nYou can use this ID in your AVISOS.md file.')
     logger.info(f'Channel ID requested by {ctx.author.name} for channel {ctx.channel.name}')
+
+@bot.command(name='user_id')
+async def user_id(ctx, member: discord.Member = None):
+    """Shows the ID of a user (or yourself if no user specified)"""
+    if member is None:
+        member = ctx.author
+    await ctx.send(f'User {member.name}\'s ID is: `{member.id}`\nYou can use this ID to mention them in messages.')
+    logger.info(f'User ID requested by {ctx.author.name} for user {member.name}')
 
 @bot.command(name='time')
 async def current_time(ctx):
@@ -128,7 +144,7 @@ async def check_schedule(ctx):
         
     response = "**Scheduled Messages:**\n"
     for i, msg in enumerate(messages, 1):
-        response += f"{i}. Days: {', '.join(msg['days'])} | Times: {', '.join(msg['times'])} | Message: {msg['message']}\n"
+        response += f"{i}. Channel: {msg['channel_id']} | Days: {', '.join(msg['days'])} | Times: {', '.join(msg['times'])} | Message: {msg['message']}\n"
     
     await ctx.send(response)
     logger.info(f'Schedule check requested by {ctx.author.name}')

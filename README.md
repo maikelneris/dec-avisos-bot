@@ -5,6 +5,7 @@ A simple Discord bot built with discord.py that sends scheduled messages and res
 ## Features
 
 - Scheduled message sending based on day and time
+- Multiple channel support (different messages to different channels)
 - Timezone support (Cuiabá/MT)
 - Rotating log system
 - Admin commands for monitoring
@@ -27,7 +28,6 @@ A simple Discord bot built with discord.py that sends scheduled messages and res
 3. Configure the bot:
    - Rename `.env.example` to `.env`
    - Replace `your_bot_token_here` with your actual bot token
-   - Add your channel ID (use !channel_id command to get it)
 
 4. Invite the bot to your server:
    - Go to OAuth2 > URL Generator in the Developer Portal
@@ -42,15 +42,16 @@ A simple Discord bot built with discord.py that sends scheduled messages and res
 
 Messages are scheduled using the `AVISOS.md` file. Each line follows this format:
 ```
-day1,day2;time1,time2;message
+CHANNEL_ID;DAYS;TIMES;MESSAGE
 ```
 
 Example:
 ```
-mon,wed;14:30;Good afternoon everyone!
-fri;09:00,15:00;Weekend is coming!
+123456789;mon,wed;14:30;Good afternoon everyone!
+987654321;fri;09:00,15:00;Weekend is coming!
 ```
 
+- CHANNEL_ID: The ID of the channel where the message will be sent (use !channel_id command to get it)
 - Days can be: mon, tue, wed, thu, fri, sat, sun
 - Times should be in 24-hour format (HH:MM)
 - Multiple days or times should be separated by commas
@@ -118,7 +119,6 @@ The bot maintains logs in `logs.txt` with the following features:
 
 1. If the bot doesn't start:
    - Check if the token in `.env` is correct
-   - Verify that CHANNEL_ID is set correctly
    - Check `logs.txt` for error messages
 
 2. If scheduled messages aren't sending:
@@ -126,6 +126,7 @@ The bot maintains logs in `logs.txt` with the following features:
    - Check if the bot has permissions in the channel
    - Use `!time` to verify the bot's current time
    - Use `!check_schedule` to verify your scheduled messages
+   - Verify channel IDs are correct
 
 3. If the bot goes offline:
    - Check your internet connection
