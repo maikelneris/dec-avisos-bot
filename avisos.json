@@ -1,0 +1,11 @@
+{
+    "avisos": [
+        {
+            "server": "designers",
+            "channel_id": "1231231231",
+            "day": ["tue", "wed", "thu", "fri"],
+            "hour": "13:40",
+            "message": "@everyone SOCIAL MEDIAS - Arquivar cards dos designer"
+        }
+    ]
+} 
